@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wishlist API Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, button {
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Wishlist API Tester</h1>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Authentication</h2>
+            <div class="form-group">
+                <label for="phone">Phone Number:</label>
+                <input type="text" id="phone" placeholder="Enter 10-digit phone number" value="1234567890">
+            </div>
+            <div class="form-group">
+                <label for="otp">OTP:</label>
+                <input type="text" id="otp" placeholder="Enter OTP" value="1212">
+            </div>
+            <button id="sendOtpBtn">Send OTP</button>
+            <button id="verifyOtpBtn">Verify OTP</button>
+            <div class="form-group">
+                <label>Token:</label>
+                <pre id="tokenDisplay">None</pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Wishlist Operations</h2>
+            <div class="form-group">
+                <label for="merchantId">Merchant ID:</label>
+                <input type="text" id="merchantId" placeholder="Enter merchant ID" value="merchant123">
+            </div>
+            <div class="form-group">
+                <label for="productId">Product ID:</label>
+                <input type="text" id="productId" placeholder="Enter product ID" value="product123">
+            </div>
+            <button id="addToWishlistBtn">Add to Wishlist</button>
+            <button id="getWishlistBtn">Get Wishlist</button>
+            <button id="getMerchantWishlistBtn">Get Merchant Wishlist</button>
+            <button id="getInterestedBtn">Get Interested Count</button>
+            <div class="form-group">
+                <label for="itemId">Item ID (for delete):</label>
+                <input type="text" id="itemId" placeholder="Enter item ID to delete">
+            </div>
+            <button id="deleteItemBtn">Delete Item</button>
+            <div class="form-group">
+                <label>Response:</label>
+                <pre id="wishlistResponse">None</pre>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Product Price History</h2>
+            <div class="form-group">
+                <label for="webhookProductId">Product ID:</label>
+                <input type="text" id="webhookProductId" placeholder="Enter product ID" value="product123">
+            </div>
+            <div class="form-group">
+                <label for="webhookPrice">Price:</label>
+                <input type="number" id="webhookPrice" placeholder="Enter price" value="99.99">
+            </div>
+            <div class="form-group">
+                <label for="webhookTitle">Title (optional):</label>
+                <input type="text" id="webhookTitle" placeholder="Enter product title" value="Test Product">
+            </div>
+            <button id="simulateWebhookBtn">Simulate Shopify Webhook</button>
+            <button id="getPriceComparisonBtn">Get Price Comparison</button>
+            <div class="form-group">
+                <label>Response:</label>
+                <pre id="productResponse">None</pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let token = '';
+        
+        // Send OTP
+        document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+            const phone = document.getElementById('phone').value;
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/send-otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone })
+                });
+                
+                const data = await response.json();
+                document.getElementById('tokenDisplay').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('tokenDisplay').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Verify OTP
+        document.getElementById('verifyOtpBtn').addEventListener('click', async () => {
+            const phone = document.getElementById('phone').value;
+            const otp = document.getElementById('otp').value;
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/auth/verify-otp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phone, otp })
+                });
+                
+                const data = await response.json();
+                token = data.token;
+                document.getElementById('tokenDisplay').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('tokenDisplay').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Add to Wishlist
+        document.getElementById('addToWishlistBtn').addEventListener('click', async () => {
+            if (!token) {
+                document.getElementById('wishlistResponse').textContent = 'Please verify OTP first to get token';
+                return;
+            }
+            
+            const merchantId = document.getElementById('merchantId').value;
+            const productId = document.getElementById('productId').value;
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/wishlist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        merchantId,
+                        productId,
+                        token
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Add to Wishlist Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Add to Wishlist Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Get Wishlist
+        document.getElementById('getWishlistBtn').addEventListener('click', async () => {
+            if (!token) {
+                document.getElementById('wishlistResponse').textContent = 'Please verify OTP first to get token';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/wishlist', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Get Wishlist Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Get Wishlist Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Get Merchant Wishlist
+        document.getElementById('getMerchantWishlistBtn').addEventListener('click', async () => {
+            if (!token) {
+                document.getElementById('wishlistResponse').textContent = 'Please verify OTP first to get token';
+                return;
+            }
+            
+            const merchantId = document.getElementById('merchantId').value;
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/wishlist/merchant', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token,
+                        merchantId
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Get Merchant Wishlist Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Get Merchant Wishlist Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Get Interested Count
+        document.getElementById('getInterestedBtn').addEventListener('click', async () => {
+            const productId = document.getElementById('productId').value;
+            
+            if (!productId) {
+                document.getElementById('wishlistResponse').textContent = 'Product ID is required';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/wishlist/interested', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ productId })
+                });
+                
+                const data = await response.json();
+                console.log('Get Interested Count Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Get Interested Count Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Delete Item
+        document.getElementById('deleteItemBtn').addEventListener('click', async () => {
+            if (!token) {
+                document.getElementById('wishlistResponse').textContent = 'Please verify OTP first to get token';
+                return;
+            }
+            
+            const itemId = document.getElementById('itemId').value;
+            
+            if (!itemId) {
+                document.getElementById('wishlistResponse').textContent = 'Item ID is required';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:3000/api/wishlist/delete/${itemId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Delete Item Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Delete Item Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Simulate Shopify Webhook
+        document.getElementById('simulateWebhookBtn').addEventListener('click', async () => {
+            const productId = document.getElementById('webhookProductId').value;
+            const price = document.getElementById('webhookPrice').value;
+            const title = document.getElementById('webhookTitle').value;
+            
+            if (!productId || !price) {
+                document.getElementById('productResponse').textContent = 'Product ID and price are required';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/products/webhook', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        id: productId,
+                        price: parseFloat(price),
+                        title
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Webhook Response:', data);
+                document.getElementById('productResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Webhook Error:', error);
+                document.getElementById('productResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+        
+        // Get Price Comparison
+        document.getElementById('getPriceComparisonBtn').addEventListener('click', async () => {
+            const productId = document.getElementById('webhookProductId').value;
+            
+            if (!productId) {
+                document.getElementById('productResponse').textContent = 'Product ID is required';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`http://localhost:3000/api/products/${productId}/price-comparison`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('Price Comparison Response:', data);
+                document.getElementById('productResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Price Comparison Error:', error);
+                document.getElementById('productResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
