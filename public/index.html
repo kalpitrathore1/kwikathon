@@ -353,18 +353,23 @@
         // Get Price Comparison
         document.getElementById('getPriceComparisonBtn').addEventListener('click', async () => {
             const productId = document.getElementById('webhookProductId').value;
+            const price = document.getElementById('webhookPrice').value;
             
-            if (!productId) {
-                document.getElementById('productResponse').textContent = 'Product ID is required';
+            if (!productId || !price) {
+                document.getElementById('productResponse').textContent = 'Product ID and price are required';
                 return;
             }
             
             try {
-                const response = await fetch(`http://localhost:3000/api/products/${productId}/price-comparison`, {
-                    method: 'GET',
+                const response = await fetch('http://localhost:3000/api/products/price-comparison', {
+                    method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    body: JSON.stringify({
+                        productId,
+                        price: parseFloat(price)
+                    })
                 });
                 
                 const data = await response.json();

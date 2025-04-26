@@ -59,20 +59,25 @@ router.post('/webhook', async (req, res) => {
   }
 });
 
-// @route   GET api/products/:productId/price-comparison
+// @route   POST api/products/price-comparison
 // @desc    Get price comparison for a product
 // @access  Public
-router.get('/:productId/price-comparison', async (req, res) => {
+router.post('/price-comparison', async (req, res) => {
   try {
-    console.log('Price comparison request received for productId:', req.params.productId);
-    const { productId } = req.params;
+    const { productId, price } = req.body;
+    console.log('Price comparison request received:', req.body);
 
     if (!productId) {
       return res.status(400).json({ msg: 'Product ID is required' });
     }
 
+    if (price === undefined) {
+      return res.status(400).json({ msg: 'Price is required' });
+    }
+
+    const currentPrice = parseFloat(price);
+
     let priceHistory = [];
-    let currentPrice = null;
     let lowestPrice = null;
     let isAllTimeLow = false;
 
@@ -85,13 +90,15 @@ router.get('/:productId/price-comparison', async (req, res) => {
           .lean();
 
         if (priceHistory.length > 0) {
-          currentPrice = priceHistory[0].price;
-          
           // Find the lowest price in history
           lowestPrice = Math.min(...priceHistory.map(entry => entry.price));
           
           // Check if current price is the all-time low
           isAllTimeLow = currentPrice <= lowestPrice;
+        } else {
+          // If no price history, the current price is the all-time low
+          lowestPrice = currentPrice;
+          isAllTimeLow = true;
         }
       } catch (dbError) {
         console.warn('Database operation failed:', dbError.message);
@@ -104,25 +111,34 @@ router.get('/:productId/price-comparison', async (req, res) => {
         .sort((a, b) => b.timestamp - a.timestamp);
 
       if (priceHistory.length > 0) {
-        currentPrice = priceHistory[0].price;
-        
         // Find the lowest price in history
         lowestPrice = Math.min(...priceHistory.map(entry => entry.price));
         
         // Check if current price is the all-time low
         isAllTimeLow = currentPrice <= lowestPrice;
+      } else {
+        // If no price history, the current price is the all-time low
+        lowestPrice = currentPrice;
+        isAllTimeLow = true;
       }
     }
+
+    // Add the current price to the price history for display purposes only
+    const displayPriceHistory = [
+      { price: currentPrice, timestamp: new Date(), isCurrent: true },
+      ...priceHistory.map(entry => ({
+        price: entry.price,
+        timestamp: entry.timestamp,
+        isCurrent: false
+      }))
+    ];
 
     const responseData = {
       productId,
       currentPrice,
       lowestPrice,
       isAllTimeLow,
-      priceHistory: priceHistory.map(entry => ({
-        price: entry.price,
-        timestamp: entry.timestamp
-      }))
+      priceHistory: displayPriceHistory
     };
     
     console.log('Price comparison response:', JSON.stringify(responseData, null, 2));
