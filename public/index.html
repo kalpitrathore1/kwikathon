@@ -84,6 +84,10 @@
                 <label for="productId">Product ID:</label>
                 <input type="text" id="productId" placeholder="Enter product ID" value="product123">
             </div>
+            <div class="form-group">
+                <label for="wishlistId">Wishlist ID (for remove product):</label>
+                <input type="text" id="wishlistId" placeholder="Enter wishlist ID">
+            </div>
             <button id="addToWishlistBtn">Add to Wishlist</button>
             <button id="removeProductBtn">Remove Product from Wishlist</button>
             <button id="getWishlistBtn">Get Wishlist</button>
@@ -207,11 +211,11 @@
                 return;
             }
             
-            const merchantId = document.getElementById('merchantId').value;
+            const wishlistId = document.getElementById('wishlistId').value;
             const productId = document.getElementById('productId').value;
             
-            if (!merchantId || !productId) {
-                document.getElementById('wishlistResponse').textContent = 'Merchant ID and Product ID are required';
+            if (!wishlistId || !productId) {
+                document.getElementById('wishlistResponse').textContent = 'Wishlist ID and Product ID are required';
                 return;
             }
             
@@ -222,7 +226,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        merchantId,
+                        wishlistId,
                         productId,
                         token
                     })

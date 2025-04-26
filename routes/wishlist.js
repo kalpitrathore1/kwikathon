@@ -258,23 +258,25 @@ router.post('/interested', async (req, res) => {
 // @access  Private
 router.post('/remove-product', bodyAuth, async (req, res) => {
   try {
-    const { merchantId, productId } = req.body;
+    const { wishlistId, productId } = req.body;
 
-    if (!merchantId || !productId) {
-      return res.status(400).json({ msg: 'Merchant ID and Product ID are required' });
+    if (!wishlistId || !productId) {
+      return res.status(400).json({ msg: 'Wishlist ID and Product ID are required' });
     }
 
     // Check if MongoDB is connected
     if (global.isMongoDBConnected) {
       try {
-        // Find the wishlist item
-        const wishlistItem = await WishlistItem.findOne({
-          phone: req.user.phone,
-          merchantId
-        });
+        // Find the wishlist item by ID
+        const wishlistItem = await WishlistItem.findById(wishlistId);
 
         if (!wishlistItem) {
           return res.status(404).json({ msg: 'Wishlist not found' });
+        }
+
+        // Check if the user owns the wishlist
+        if (wishlistItem.phone !== req.user.phone) {
+          return res.status(401).json({ msg: 'User not authorized' });
         }
 
         // Check if the product is in the wishlist
@@ -303,7 +305,7 @@ router.post('/remove-product', bodyAuth, async (req, res) => {
     
     // Use in-memory storage
     const wishlistIndex = inMemoryWishlist.findIndex(
-      item => item.phone === req.user.phone && item.merchantId === merchantId
+      item => item.id === wishlistId
     );
 
     if (wishlistIndex === -1) {
@@ -311,6 +313,11 @@ router.post('/remove-product', bodyAuth, async (req, res) => {
     }
 
     const wishlist = inMemoryWishlist[wishlistIndex];
+    
+    // Check if the user owns the wishlist
+    if (wishlist.phone !== req.user.phone) {
+      return res.status(401).json({ msg: 'User not authorized' });
+    }
 
     // Check if the product is in the wishlist
     if (!wishlist.productIds.includes(productId)) {
