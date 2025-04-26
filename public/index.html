@@ -85,6 +85,7 @@
                 <input type="text" id="productId" placeholder="Enter product ID" value="product123">
             </div>
             <button id="addToWishlistBtn">Add to Wishlist</button>
+            <button id="removeProductBtn">Remove Product from Wishlist</button>
             <button id="getWishlistBtn">Get Wishlist</button>
             <button id="getMerchantWishlistBtn">Get Merchant Wishlist</button>
             <button id="getInterestedBtn">Get Interested Count</button>
@@ -195,6 +196,43 @@
                 document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
             } catch (error) {
                 console.error('Add to Wishlist Error:', error);
+                document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
+            }
+        });
+
+        // Remove Product from Wishlist
+        document.getElementById('removeProductBtn').addEventListener('click', async () => {
+            if (!token) {
+                document.getElementById('wishlistResponse').textContent = 'Please verify OTP first to get token';
+                return;
+            }
+            
+            const merchantId = document.getElementById('merchantId').value;
+            const productId = document.getElementById('productId').value;
+            
+            if (!merchantId || !productId) {
+                document.getElementById('wishlistResponse').textContent = 'Merchant ID and Product ID are required';
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:3000/api/wishlist/remove-product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        merchantId,
+                        productId,
+                        token
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Remove Product Response:', data);
+                document.getElementById('wishlistResponse').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                console.error('Remove Product Error:', error);
                 document.getElementById('wishlistResponse').textContent = 'Error: ' + error.message;
             }
         });

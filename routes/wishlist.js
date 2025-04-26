@@ -23,26 +23,37 @@ router.post('/', bodyAuth, async (req, res) => {
     // Check if MongoDB is connected
     if (global.isMongoDBConnected) {
       try {
-        // Check if the item already exists in the user's wishlist
-        const existingItem = await WishlistItem.findOne({
+        // Check if a wishlist for this merchant already exists
+        let wishlistItem = await WishlistItem.findOne({
           phone: req.user.phone,
-          merchantId,
-          productId
+          merchantId
         });
 
-        if (existingItem) {
-          return res.status(400).json({ msg: 'Item already in wishlist' });
+        if (wishlistItem) {
+          // Check if the product is already in the wishlist
+          if (wishlistItem.productIds.includes(productId)) {
+            return res.status(400).json({ msg: 'Product already in wishlist' });
+          }
+
+          // Add the product to the existing wishlist
+          wishlistItem.productIds.push(productId);
+          wishlistItem.updatedAt = new Date();
+          await wishlistItem.save();
+          
+          return res.json(wishlistItem);
+        } else {
+          // Create a new wishlist item
+          const newWishlistItem = new WishlistItem({
+            phone: req.user.phone,
+            merchantId,
+            productIds: [productId],
+            addedAt: new Date(),
+            updatedAt: new Date()
+          });
+
+          const savedWishlistItem = await newWishlistItem.save();
+          return res.json(savedWishlistItem);
         }
-
-        // Create a new wishlist item
-        const newWishlistItem = new WishlistItem({
-          phone: req.user.phone,
-          merchantId,
-          productId
-        });
-
-        const wishlistItem = await newWishlistItem.save();
-        return res.json(wishlistItem);
       } catch (dbError) {
         console.warn('Database operation failed:', dbError.message);
         // Fall through to in-memory storage
@@ -50,26 +61,36 @@ router.post('/', bodyAuth, async (req, res) => {
     }
     
     // Use in-memory storage
-    const existingItemIndex = inMemoryWishlist.findIndex(
-      item => item.phone === req.user.phone &&
-             item.merchantId === merchantId &&
-             item.productId === productId
+    // Check if a wishlist for this merchant already exists
+    const existingWishlistIndex = inMemoryWishlist.findIndex(
+      item => item.phone === req.user.phone && item.merchantId === merchantId
     );
 
-    if (existingItemIndex !== -1) {
-      return res.status(400).json({ msg: 'Item already in wishlist' });
+    if (existingWishlistIndex !== -1) {
+      // Check if the product is already in the wishlist
+      if (inMemoryWishlist[existingWishlistIndex].productIds.includes(productId)) {
+        return res.status(400).json({ msg: 'Product already in wishlist' });
+      }
+
+      // Add the product to the existing wishlist
+      inMemoryWishlist[existingWishlistIndex].productIds.push(productId);
+      inMemoryWishlist[existingWishlistIndex].updatedAt = new Date();
+      
+      return res.json(inMemoryWishlist[existingWishlistIndex]);
+    } else {
+      // Create a new wishlist item
+      const newWishlistItem = {
+        id: Date.now().toString(),
+        phone: req.user.phone,
+        merchantId,
+        productIds: [productId],
+        addedAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      inMemoryWishlist.push(newWishlistItem);
+      res.json(newWishlistItem);
     }
-
-    const newWishlistItem = {
-      id: Date.now().toString(),
-      phone: req.user.phone,
-      merchantId,
-      productId,
-      addedAt: new Date()
-    };
-
-    inMemoryWishlist.push(newWishlistItem);
-    res.json(newWishlistItem);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -208,7 +229,7 @@ router.post('/interested', async (req, res) => {
     if (global.isMongoDBConnected) {
       try {
         // Count the number of unique users who have added this product to their wishlist
-        const uniqueUsers = await WishlistItem.distinct('phone', { productId });
+        const uniqueUsers = await WishlistItem.distinct('phone', { productIds: productId });
         return res.json({ count: uniqueUsers.length });
       } catch (dbError) {
         console.warn('Database operation failed:', dbError.message);
@@ -220,12 +241,93 @@ router.post('/interested', async (req, res) => {
     // Get unique phone numbers who have added this product to their wishlist
     const uniqueUsers = new Set();
     inMemoryWishlist.forEach(item => {
-      if (item.productId === productId) {
+      if (item.productIds && item.productIds.includes(productId)) {
         uniqueUsers.add(item.phone);
       }
     });
     
     res.json({ count: uniqueUsers.size });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   POST api/wishlist/remove-product
+// @desc    Remove a product from a wishlist
+// @access  Private
+router.post('/remove-product', bodyAuth, async (req, res) => {
+  try {
+    const { merchantId, productId } = req.body;
+
+    if (!merchantId || !productId) {
+      return res.status(400).json({ msg: 'Merchant ID and Product ID are required' });
+    }
+
+    // Check if MongoDB is connected
+    if (global.isMongoDBConnected) {
+      try {
+        // Find the wishlist item
+        const wishlistItem = await WishlistItem.findOne({
+          phone: req.user.phone,
+          merchantId
+        });
+
+        if (!wishlistItem) {
+          return res.status(404).json({ msg: 'Wishlist not found' });
+        }
+
+        // Check if the product is in the wishlist
+        if (!wishlistItem.productIds.includes(productId)) {
+          return res.status(404).json({ msg: 'Product not found in wishlist' });
+        }
+
+        // Remove the product from the wishlist
+        wishlistItem.productIds = wishlistItem.productIds.filter(id => id !== productId);
+        wishlistItem.updatedAt = new Date();
+
+        // If there are no more products, delete the wishlist item
+        if (wishlistItem.productIds.length === 0) {
+          await wishlistItem.deleteOne();
+          return res.json({ msg: 'Product removed and wishlist deleted (empty)' });
+        } else {
+          // Save the updated wishlist item
+          await wishlistItem.save();
+          return res.json({ msg: 'Product removed from wishlist', wishlistItem });
+        }
+      } catch (dbError) {
+        console.warn('Database operation failed:', dbError.message);
+        // Fall through to in-memory storage
+      }
+    }
+    
+    // Use in-memory storage
+    const wishlistIndex = inMemoryWishlist.findIndex(
+      item => item.phone === req.user.phone && item.merchantId === merchantId
+    );
+
+    if (wishlistIndex === -1) {
+      return res.status(404).json({ msg: 'Wishlist not found' });
+    }
+
+    const wishlist = inMemoryWishlist[wishlistIndex];
+
+    // Check if the product is in the wishlist
+    if (!wishlist.productIds.includes(productId)) {
+      return res.status(404).json({ msg: 'Product not found in wishlist' });
+    }
+
+    // Remove the product from the wishlist
+    wishlist.productIds = wishlist.productIds.filter(id => id !== productId);
+    wishlist.updatedAt = new Date();
+
+    // If there are no more products, delete the wishlist item
+    if (wishlist.productIds.length === 0) {
+      inMemoryWishlist.splice(wishlistIndex, 1);
+      return res.json({ msg: 'Product removed and wishlist deleted (empty)' });
+    } else {
+      return res.json({ msg: 'Product removed from wishlist', wishlist });
+    }
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
