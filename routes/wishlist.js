@@ -285,7 +285,10 @@ router.post('/remove-product', bodyAuth, async (req, res) => {
         }
 
         // Remove the product from the wishlist
-        wishlistItem.productIds = wishlistItem.productIds.filter(id => id !== productId);
+        const index = wishlistItem.productIds.indexOf(productId);
+        if (index > -1) {
+          wishlistItem.productIds.splice(index, 1);
+        }
         wishlistItem.updatedAt = new Date();
 
         // If there are no more products, delete the wishlist item
